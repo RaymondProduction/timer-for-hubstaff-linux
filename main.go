@@ -5,6 +5,7 @@ import (
     "fmt"
     "os"
     "os/exec"
+    "path/filepath"
     "time"
 
     "github.com/getlantern/systray"
@@ -75,7 +76,16 @@ func getIcon(filePath string) []byte {
 
 // getTrackedTime fetches the tracked time from Hubstaff CLI
 func getTrackedTime() (string, error) {
-    cmd := exec.Command("~/./Hubstaff/HubstaffCLI.bin.x86_64", "status")
+    // Get the home directory
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return "", err
+    }
+
+    // Create the command with the specified directory
+    cmd := exec.Command("./HubstaffCLI.bin.x86_64", "status")
+    cmd.Dir = filepath.Join(homeDir, "Hubstaff")
+
     output, err := cmd.Output()
     if err != nil {
         return "", err
