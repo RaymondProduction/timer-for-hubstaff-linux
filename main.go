@@ -1,12 +1,21 @@
 package main
 
 import (
+    "encoding/json"
     "fmt"
-    "time"
     "os"
+    "os/exec"
+    "time"
 
     "github.com/getlantern/systray"
 )
+
+type HubstaffStatus struct {
+    ActiveProject struct {
+        TrackedToday string `json:"tracked_today"`
+    } `json:"active_project"`
+    Tracking bool `json:"tracking"`
+}
 
 func main() {
     systray.Run(onReady, onExit)
@@ -21,11 +30,16 @@ func onReady() {
     mMessage := systray.AddMenuItem("Show Message", "Show a text message")
     mQuit := systray.AddMenuItem("Quit", "Quit the whole app")
 
-    // Run a goroutine to update the time
+    // Run a goroutine to update the time from Hubstaff CLI
     go func() {
         for {
-            now := time.Now().Format("15:04:05")
-            systray.SetTitle(fmt.Sprintf("Time: %s", now))
+            trackedTime, err := getTrackedTime()
+            if err != nil {
+                systray.SetTitle("Error fetching time")
+                fmt.Println("Error fetching tracked time:", err)
+            } else {
+                systray.SetTitle(fmt.Sprintf("Tracked: %s", trackedTime))
+            }
             time.Sleep(1 * time.Second)
         }
     }()
@@ -50,13 +64,28 @@ func onExit() {
     // Cleaning up resources before exiting
 }
 
-
 // getIcon reads an icon file from the given path.
 func getIcon(filePath string) []byte {
-	icon, err := os.ReadFile(filePath)
-	if err != nil {
-		//log.Fatalf("Error during downloading icon: %v", err)
-		fmt.Printf("Error during downloading icon: %v\n", err)
-	}
-	return icon
+    icon, err := os.ReadFile(filePath)
+    if err != nil {
+        fmt.Printf("Error during downloading icon: %v\n", err)
+    }
+    return icon
+}
+
+// getTrackedTime fetches the tracked time from Hubstaff CLI
+func getTrackedTime() (string, error) {
+    cmd := exec.Command("~/./Hubstaff/HubstaffCLI.bin.x86_64", "status")
+    output, err := cmd.Output()
+    if err != nil {
+        return "", err
+    }
+
+    var status HubstaffStatus
+    err = json.Unmarshal(output, &status)
+    if err != nil {
+        return "", err
+    }
+
+    return status.ActiveProject.TrackedToday, nil
 }
