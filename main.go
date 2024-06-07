@@ -24,18 +24,24 @@ var trackedTime time.Duration
 var tracking bool
 var ticker *time.Ticker
 
-var red []byte
-var green []byte
+var redIcon []byte
+var greenIcon []byte
+
+var iconChangeChan chan []byte
 
 func main() {
+    iconChangeChan = make(chan []byte, 1)
     systray.Run(onReady, onExit)
 }
 
 func onReady() {
-    red := getIcon("redIcon.png")
-    green := getIcon("greenIcon.png")
+    redIcon = getIcon("redIcon.png")
+    greenIcon = getIcon("greenIcon.png")
 
-    systray.SetIcon(red)
+    fmt.Println("Red icon size:", len(redIcon))
+    fmt.Println("Green icon size:", len(greenIcon))
+
+    systray.SetIcon(redIcon)
     systray.SetTitle("Tray Clock")
     systray.SetTooltip("Tray Clock with Messages")
 
@@ -46,7 +52,6 @@ func onReady() {
     // Initial fetch of tracked time
     trackedTime, tracking = fetchInitialTime()
     if tracking {
-        systray.SetIcon(green)
         startTicker()
     }
 
@@ -56,33 +61,33 @@ func onReady() {
             time.Sleep(1 * time.Minute)
             trackedTime, tracking = fetchInitialTime()
             if tracking && ticker == nil {
-                systray.SetIcon(green)
                 startTicker()
             } else if !tracking && ticker != nil {
-                systray.SetIcon(red)
                 stopTicker()
             }
         }
     }()
 
-    // Handle menu events
-    go func() {
-        for {
-            select {
-            case <-mMessage.ClickedCh:
-                systray.SetTitle("New Message!")
-                fmt.Println("This is your message!")
-            case <-mQuit.ClickedCh:
-                systray.Quit()
-                fmt.Println("Quiting...")
-                return
-            }
+    // Handle icon changes and menu events in the main goroutine
+    for {
+        select {
+        case icon := <-iconChangeChan:
+            fmt.Println("Main loop: Changing icon")
+            systray.SetIcon(icon)
+        case <-mMessage.ClickedCh:
+            systray.SetTitle("New Message!")
+            fmt.Println("This is your message!")
+        case <-mQuit.ClickedCh:
+            systray.Quit()
+            fmt.Println("Quitting...")
+            return
         }
-    }()
+    }
 }
 
 func onExit() {
     // Cleaning up resources before exiting
+    close(iconChangeChan)
 }
 
 // getIcon reads an icon file from the given path.
@@ -163,6 +168,8 @@ func formatDuration(d time.Duration) string {
 // startTicker starts the ticker for updating the time every second
 func startTicker() {
     ticker = time.NewTicker(1 * time.Second)
+    fmt.Println("Starting ticker")
+    iconChangeChan <- greenIcon
     go func() {
         for range ticker.C {
             trackedTime += time.Second
@@ -177,4 +184,6 @@ func stopTicker() {
         ticker.Stop()
         ticker = nil
     }
+    fmt.Println("Stopping ticker")
+    iconChangeChan <- redIcon
 }
