@@ -24,12 +24,18 @@ var trackedTime time.Duration
 var tracking bool
 var ticker *time.Ticker
 
+var red []byte
+var green []byte
+
 func main() {
     systray.Run(onReady, onExit)
 }
 
 func onReady() {
-    systray.SetIcon(getIcon("redIcon.png"))
+    red := getIcon("redIcon.png")
+    green := getIcon("greenIcon.png")
+
+    systray.SetIcon(red)
     systray.SetTitle("Tray Clock")
     systray.SetTooltip("Tray Clock with Messages")
 
@@ -40,6 +46,7 @@ func onReady() {
     // Initial fetch of tracked time
     trackedTime, tracking = fetchInitialTime()
     if tracking {
+        systray.SetIcon(green)
         startTicker()
     }
 
@@ -49,8 +56,10 @@ func onReady() {
             time.Sleep(1 * time.Minute)
             trackedTime, tracking = fetchInitialTime()
             if tracking && ticker == nil {
+                systray.SetIcon(green)
                 startTicker()
             } else if !tracking && ticker != nil {
+                systray.SetIcon(red)
                 stopTicker()
             }
         }
