@@ -21,6 +21,8 @@ type HubstaffStatus struct {
 }
 
 var trackedTime time.Duration
+var tracking bool
+var ticker *time.Ticker
 
 func main() {
     systray.Run(onReady, onExit)
@@ -36,22 +38,21 @@ func onReady() {
     mQuit := systray.AddMenuItem("Quit", "Quit the whole app")
 
     // Initial fetch of tracked time
-    trackedTime = fetchInitialTime()
-
-    // Run a goroutine to update the time every second
-    go func() {
-        ticker := time.NewTicker(1 * time.Second)
-        for range ticker.C {
-            trackedTime += time.Second
-            systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
-        }
-    }()
+    trackedTime, tracking = fetchInitialTime()
+    if tracking {
+        startTicker()
+    }
 
     // Run a goroutine to sync time with Hubstaff CLI every minute
     go func() {
         for {
             time.Sleep(1 * time.Minute)
-            trackedTime = fetchInitialTime()
+            trackedTime, tracking = fetchInitialTime()
+            if tracking && ticker == nil {
+                startTicker()
+            } else if !tracking && ticker != nil {
+                stopTicker()
+            }
         }
     }()
 
@@ -85,12 +86,12 @@ func getIcon(filePath string) []byte {
 }
 
 // fetchInitialTime fetches the tracked time from Hubstaff CLI and converts it to a time.Duration
-func fetchInitialTime() time.Duration {
+func fetchInitialTime() (time.Duration, bool) {
     // Get the home directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
         fmt.Println("Error fetching home directory:", err)
-        return 0
+        return 0, false
     }
 
     // Create the command with the specified directory
@@ -100,14 +101,14 @@ func fetchInitialTime() time.Duration {
     output, err := cmd.Output()
     if err != nil {
         fmt.Println("Error fetching tracked time:", err)
-        return 0
+        return 0, false
     }
 
     var status HubstaffStatus
     err = json.Unmarshal(output, &status)
     if err != nil {
         fmt.Println("Error parsing tracked time:", err)
-        return 0
+        return 0, false
     }
 
     fmt.Println("Synchronization by command ./HubstaffCLI.bin.x86_64. TrackedToday = ", status.ActiveProject.TrackedToday)
@@ -115,10 +116,10 @@ func fetchInitialTime() time.Duration {
     duration, err := parseDuration(status.ActiveProject.TrackedToday)
     if err != nil {
         fmt.Println("Error parsing duration:", err)
-        return 0
+        return 0, false
     }
 
-    return duration
+    return duration, status.Tracking
 }
 
 // parseDuration parses a duration string in the format "hh:mm:ss" to time.Duration
@@ -148,4 +149,23 @@ func formatDuration(d time.Duration) string {
     minutes := int(d.Minutes()) % 60
     seconds := int(d.Seconds()) % 60
     return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+// startTicker starts the ticker for updating the time every second
+func startTicker() {
+    ticker = time.NewTicker(1 * time.Second)
+    go func() {
+        for range ticker.C {
+            trackedTime += time.Second
+            systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
+        }
+    }()
+}
+
+// stopTicker stops the ticker
+func stopTicker() {
+    if ticker != nil {
+        ticker.Stop()
+        ticker = nil
+    }
 }
