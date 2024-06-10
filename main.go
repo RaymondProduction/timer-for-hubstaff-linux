@@ -1,6 +1,7 @@
 package main
 
 import (
+    "bytes"
     "encoding/json"
     "fmt"
     "image"
@@ -175,7 +176,7 @@ func startTicker() {
         for range ticker.C {
             trackedTime += time.Second
             systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
-            progress := float64(trackedTime) / (8 * time.Hour) // 8 hours as 100%
+            progress := float64(trackedTime) / float64(8*time.Hour) // 8 hours as 100%
             iconChangeChan <- createProgressIcon(progress)
         }
     }()
