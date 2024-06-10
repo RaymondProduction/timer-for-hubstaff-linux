@@ -197,8 +197,8 @@ func createProgressIcon(progress float64) []byte {
     const size = 64
     dc := gg.NewContext(size, size)
 
-    // Draw background
-    dc.SetColor(color.White)
+    // Draw transparent background
+    dc.SetColor(color.RGBA{0, 0, 0, 0}) // Transparent color
     dc.Clear()
 
     // Draw progress circle
