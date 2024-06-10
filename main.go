@@ -8,6 +8,7 @@ import (
     "image/color"
     "image/draw"
     "image/png"
+    "math"
     "os"
     "os/exec"
     "path/filepath"
@@ -201,9 +202,13 @@ func createProgressIcon(progress float64) []byte {
     dc.SetColor(color.RGBA{0, 0, 0, 0}) // Transparent color
     dc.Clear()
 
-    // Draw progress circle
+    // Draw progress arc
     dc.SetColor(color.RGBA{0, 255, 0, 255}) // Green color
-    dc.DrawArc(float64(size)/2, float64(size)/2, float64(size)/2, -gg.Radians(90), -gg.Radians(90)+2*gg.Radians(360*progress))
+    startAngle := -gg.Radians(90)
+    endAngle := startAngle + (2 * math.Pi * progress)
+    dc.DrawArc(float64(size)/2, float64(size)/2, float64(size)/2, startAngle, endAngle)
+    dc.LineTo(float64(size)/2, float64(size)/2)
+    dc.ClosePath()
     dc.Fill()
 
     // Draw border
