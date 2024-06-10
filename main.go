@@ -57,6 +57,7 @@ func onReady() {
     trackedTime, tracking = fetchInitialTime()
     if tracking {
         startTicker()
+        updateIcon()
     }
 
     // Run a goroutine to sync time with Hubstaff CLI every minute
@@ -64,6 +65,7 @@ func onReady() {
         for {
             time.Sleep(1 * time.Minute)
             trackedTime, tracking = fetchInitialTime()
+            updateIcon()
             if tracking && ticker == nil {
                 startTicker()
             } else if !tracking && ticker != nil {
@@ -177,8 +179,6 @@ func startTicker() {
         for range ticker.C {
             trackedTime += time.Second
             systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
-            progress := float64(trackedTime) / float64(8*time.Hour) // 8 hours as 100%
-            iconChangeChan <- createProgressIcon(progress)
         }
     }()
 }
@@ -193,6 +193,12 @@ func stopTicker() {
     iconChangeChan <- redIcon
 }
 
+// updateIcon updates the progress icon based on the tracked time
+func updateIcon() {
+    progress := float64(trackedTime) / float64(8*time.Hour) // 8 hours as 100%
+    iconChangeChan <- createProgressIcon(progress)
+}
+
 // createProgressIcon creates an icon with a progress circle
 func createProgressIcon(progress float64) []byte {
     const size = 64
@@ -202,7 +208,7 @@ func createProgressIcon(progress float64) []byte {
     dc.SetColor(color.RGBA{0, 0, 0, 0}) // Transparent color
     dc.Clear()
 
-    // Draw progress arc
+    // Draw progress circle
     dc.SetColor(color.RGBA{0, 255, 0, 255}) // Green color
     startAngle := -gg.Radians(90)
     endAngle := startAngle + (2 * math.Pi * progress)
