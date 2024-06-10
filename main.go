@@ -3,6 +3,10 @@ package main
 import (
     "encoding/json"
     "fmt"
+    "image"
+    "image/color"
+    "image/draw"
+    "image/png"
     "os"
     "os/exec"
     "path/filepath"
@@ -10,6 +14,7 @@ import (
     "strings"
     "time"
 
+    "github.com/fogleman/gg"
     "github.com/getlantern/systray"
 )
 
@@ -25,7 +30,6 @@ var tracking bool
 var ticker *time.Ticker
 
 var redIcon []byte
-var greenIcon []byte
 
 var iconChangeChan chan []byte
 
@@ -36,10 +40,8 @@ func main() {
 
 func onReady() {
     redIcon = getIcon("redIcon.png")
-    greenIcon = getIcon("greenIcon.png")
 
     fmt.Println("Red icon size:", len(redIcon))
-    fmt.Println("Green icon size:", len(greenIcon))
 
     systray.SetIcon(redIcon)
     systray.SetTitle("Tray Clock")
@@ -169,11 +171,12 @@ func formatDuration(d time.Duration) string {
 func startTicker() {
     ticker = time.NewTicker(1 * time.Second)
     fmt.Println("Starting ticker")
-    iconChangeChan <- greenIcon
     go func() {
         for range ticker.C {
             trackedTime += time.Second
             systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
+            progress := float64(trackedTime) / (8 * time.Hour) // 8 hours as 100%
+            iconChangeChan <- createProgressIcon(progress)
         }
     }()
 }
@@ -186,4 +189,32 @@ func stopTicker() {
     }
     fmt.Println("Stopping ticker")
     iconChangeChan <- redIcon
+}
+
+// createProgressIcon creates an icon with a progress circle
+func createProgressIcon(progress float64) []byte {
+    const size = 64
+    dc := gg.NewContext(size, size)
+
+    // Draw background
+    dc.SetColor(color.White)
+    dc.Clear()
+
+    // Draw progress circle
+    dc.SetColor(color.RGBA{0, 255, 0, 255}) // Green color
+    dc.DrawArc(float64(size)/2, float64(size)/2, float64(size)/2, -gg.Radians(90), -gg.Radians(90)+2*gg.Radians(360*progress))
+    dc.Fill()
+
+    // Draw border
+    dc.SetColor(color.Black)
+    dc.DrawCircle(float64(size)/2, float64(size)/2, float64(size)/2)
+    dc.Stroke()
+
+    // Save to buffer
+    img := image.NewRGBA(image.Rect(0, 0, size, size))
+    draw.Draw(img, img.Bounds(), dc.Image(), image.Point{0, 0}, draw.Src)
+
+    buf := new(bytes.Buffer)
+    png.Encode(buf, img)
+    return buf.Bytes()
 }
