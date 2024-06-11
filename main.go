@@ -202,6 +202,8 @@ func updateIcon() {
 // createProgressIcon creates an icon with a progress circle
 func createProgressIcon(progress float64) []byte {
     const size = 64
+    const borderThickness = 4 // Thickness of the border
+    const radiusOffset = 4    // Offset to reduce the radius
     dc := gg.NewContext(size, size)
 
     // Draw transparent background
@@ -212,14 +214,16 @@ func createProgressIcon(progress float64) []byte {
     dc.SetColor(color.RGBA{0, 255, 0, 255}) // Green color
     startAngle := -gg.Radians(90)
     endAngle := startAngle + (2 * math.Pi * progress)
-    dc.DrawArc(float64(size)/2, float64(size)/2, float64(size)/2, startAngle, endAngle)
+    radius := float64(size)/2 - radiusOffset
+    dc.DrawArc(float64(size)/2, float64(size)/2, radius, startAngle, endAngle)
     dc.LineTo(float64(size)/2, float64(size)/2)
     dc.ClosePath()
     dc.Fill()
 
-    // Draw border
-    dc.SetColor(color.Black)
-    dc.DrawCircle(float64(size)/2, float64(size)/2, float64(size)/2)
+    // Draw outer border
+    dc.SetLineWidth(borderThickness)
+    dc.SetColor(color.RGBA{0, 255, 0, 255}) // Green color
+    dc.DrawCircle(float64(size)/2, float64(size)/2, radius)
     dc.Stroke()
 
     // Save to buffer
