@@ -55,6 +55,9 @@ func onReady() {
 	systray.SetTitle("Tray Clock")
 	systray.SetTooltip("Tray Clock with Messages")
 
+	// Play sound on startup
+	go playSound("start.wav")
+
 	// Create a menu item to display a message
 	mMessage := systray.AddMenuItem("Show Message", "Show a text message")
 	mQuit := systray.AddMenuItem("Quit", "Quit the whole app")
@@ -261,4 +264,12 @@ func createProgressIcon(progress float64) []byte {
 	buf := new(bytes.Buffer)
 	png.Encode(buf, img)
 	return buf.Bytes()
+}
+
+// playSound uses paplay to play a sound file via PulseAudio
+func playSound(filePath string) {
+	cmd := exec.Command("paplay", filePath)
+	if err := cmd.Run(); err != nil {
+		fmt.Println("Error playing sound:", err)
+	}
 }
