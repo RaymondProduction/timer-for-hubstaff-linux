@@ -17,6 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/faiface/beep"
+	"github.com/faiface/beep/mp3"
+	"github.com/faiface/beep/speaker"
 	"github.com/fogleman/gg"
 	"github.com/getlantern/systray"
 )
@@ -56,7 +59,7 @@ func onReady() {
 	systray.SetTooltip("Tray Clock with Messages")
 
 	// Play sound on startup
-	go playSound("resources/start.wav")
+	go playSound("resources/start.mp3")
 
 	// Create a menu item to display a message
 	mMessage := systray.AddMenuItem("Show Message", "Show a text message")
@@ -270,10 +273,35 @@ func createProgressIcon(progress float64) []byte {
 	return buf.Bytes()
 }
 
-// playSound uses paplay to play a sound file via PulseAudio
+// playSound plays the specified sound file
 func playSound(filePath string) {
-	cmd := exec.Command("paplay", filePath)
-	if err := cmd.Run(); err != nil {
-		fmt.Println("Error playing sound:", err)
+	// try use pulseaudio package
+	/*
+		    cmd := exec.Command("paplay", filePath)
+			if err := cmd.Run(); err != nil {
+				fmt.Println("Error playing sound:", err)
+			}*/
+	// use alsa package
+	f, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println("Error opening sound file:", err)
+		return
 	}
+	defer f.Close()
+
+	streamer, format, err := mp3.Decode(f)
+	if err != nil {
+		fmt.Println("Error decoding sound file:", err)
+		return
+	}
+	defer streamer.Close()
+
+	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+
+	done := make(chan bool)
+	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
 }
