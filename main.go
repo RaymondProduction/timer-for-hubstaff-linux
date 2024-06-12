@@ -56,7 +56,7 @@ func onReady() {
 	systray.SetTooltip("Tray Clock with Messages")
 
 	// Play sound on startup
-	go playSound("start.wav")
+	go playSound("resources/start.wav")
 
 	// Create a menu item to display a message
 	mMessage := systray.AddMenuItem("Show Message", "Show a text message")
@@ -210,6 +210,10 @@ func startTicker() {
 		for range ticker.C {
 			trackedTime += time.Second
 			systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
+
+			if int(trackedTime.Minutes())%60 == 0 && int(trackedTime.Seconds())%60 == 0 {
+				go playSound("resources/alarm-clock-elapsed.oga")
+			}
 		}
 	}()
 }
