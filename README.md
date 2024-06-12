@@ -38,3 +38,21 @@ To use the test mode, run the application with the `-t` or `--test` flag followe
 ```sh
 ./main --test '{"active_project":{"id":3,"name":"Development","tracked_today":"5:50:18"},"tracking":false}'
 ```
+
+### if error:
+
+```
+# github.com/hajimehoshi/oto
+# [pkg-config --cflags  -- alsa]
+Package alsa was not found in the pkg-config search path.
+Perhaps you should add the directory containing `alsa.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'alsa', required by 'virtual:world', not found
+```
+
+### then install
+
+```sh
+sudo apt-get update
+sudo apt-get install libasound2-dev
+```
