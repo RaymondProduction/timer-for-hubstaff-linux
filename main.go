@@ -51,6 +51,8 @@ func main() {
 
 	flag.StringVar(&testMode, "t", "", "Enable test mode with status JSON")
 	flag.StringVar(&testMode, "test", "", "Enable test mode with status JSON")
+	// Set the custom usage function
+	flag.Usage = usage
 	flag.Parse()
 	iconChangeChan = make(chan []byte, 1)
 
@@ -59,6 +61,29 @@ func main() {
 	}()
 
 	gtk.Main()
+}
+
+// Custom usage function to provide detailed usage instructions and examples
+func usage() {
+	fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+	flag.PrintDefaults()
+	fmt.Fprintln(os.Stdout, []any{`
+To use the test mode, run the application with the -t or --test flag followed by a JSON string representing the status.
+
+Examples:
+
+    Tracking active with 3 hours 50 minutes 18 seconds tracked today:
+
+    ./main -t '{"active_project":{"id":3,"name":"Development","tracked_today":"3:50:18"},"tracking":true}'
+
+    Tracking active with 5 hours 50 minutes 18 seconds tracked today:
+
+    ./main --test '{"active_project":{"id":3,"name":"Development","tracked_today":"5:50:18"},"tracking":true}'
+
+    Tracking inactive with 5 hours 50 minutes 18 seconds tracked today:
+
+    ./main --test '{"active_project":{"id":3,"name":"Development","tracked_today":"5:50:18"},"tracking":false}'
+`}...)
 }
 
 func initGTKWindow() *gtk.Window {
@@ -137,7 +162,12 @@ func onReady() {
 	mQuit := systray.AddMenuItem("Quit", "Quit of Hubstaff Time Tracking Tray Application")
 
 	// Initial fetch of tracked time
-	trackedTime, tracking = fetchInitialTime()
+	if testMode != "" {
+		trackedTime, tracking = parseTestStatus(testMode)
+	} else {
+		trackedTime, tracking = fetchInitialTime()
+	}
+
 	if tracking {
 		startTicker()
 		updateIcon()
@@ -147,7 +177,11 @@ func onReady() {
 	go func() {
 		for {
 			time.Sleep(1 * time.Minute)
-			trackedTime, tracking = fetchInitialTime()
+			if testMode != "" {
+				trackedTime += time.Minute
+			} else {
+				trackedTime, tracking = fetchInitialTime()
+			}
 			updateIcon()
 			if tracking && ticker == nil {
 				startTicker()
@@ -198,9 +232,6 @@ func getIcon(filePath string) []byte {
 
 // fetchInitialTime fetches the tracked time from Hubstaff CLI and converts it to a time.Duration
 func fetchInitialTime() (time.Duration, bool) {
-	if testMode != "" {
-		return parseTestStatus(testMode)
-	}
 
 	// Get the home directory
 	homeDir, err := os.UserHomeDir()
@@ -293,8 +324,8 @@ func startTicker() {
 			trackedTime += time.Second
 			systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
 
-			if int(trackedTime.Minutes())%60 == 0 && int(trackedTime.Seconds())%60 == 0 {
-				go playSound("resources/alarm-clock-elapsed.oga")
+			if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
+				go playSound("resources/alarm-clock-elapsed.mp3")
 			}
 		}
 	}()
@@ -370,6 +401,7 @@ func playSound(filePath string) {
 
 	streamer, format, err := mp3.Decode(f)
 	if err != nil {
+		// Error decoding sound file: mp3: mp3: MPEG version 2.5 is not supported
 		fmt.Println("Error decoding sound file:", err)
 		return
 	}
