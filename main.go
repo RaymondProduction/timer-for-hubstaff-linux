@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -22,6 +23,8 @@ import (
 	"github.com/faiface/beep/speaker"
 	"github.com/fogleman/gg"
 	"github.com/getlantern/systray"
+	"github.com/gotk3/gotk3/glib"
+	"github.com/gotk3/gotk3/gtk"
 )
 
 type HubstaffStatus struct {
@@ -41,12 +44,86 @@ var iconChangeChan chan []byte
 
 var testMode string
 
+var win *gtk.Window
+
 func main() {
+	gtk.Init(nil)
+	win = initGTKWindow()
+
 	flag.StringVar(&testMode, "t", "", "Enable test mode with status JSON")
 	flag.StringVar(&testMode, "test", "", "Enable test mode with status JSON")
 	flag.Parse()
 	iconChangeChan = make(chan []byte, 1)
-	systray.Run(onReady, onExit)
+
+	go func() {
+		systray.Run(onReady, onExit)
+	}()
+
+	gtk.Main()
+}
+
+func initGTKWindow() *gtk.Window {
+
+	// Create builder
+	builder, err := gtk.BuilderNew()
+	if err != nil {
+		log.Fatal("Error bulder:", err)
+	}
+
+	// Lload the window from the Glade file into the builder
+	err = builder.AddFromFile("resources/main.glade")
+	if err != nil {
+		log.Fatal("Error when loading glade file:", err)
+	}
+
+	// We get the object of the main window by ID
+	obj, err := builder.GetObject("setting-window")
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+
+	win := obj.(*gtk.Window)
+
+	// We get the object of the main window by ID
+	objOpenFolder, err := builder.GetObject("open_folder")
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+
+	button := objOpenFolder.(*gtk.Button)
+
+	objPath, err := builder.GetObject("path")
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+
+	entry := objPath.(*gtk.Entry)
+
+	button.Connect("clicked", func() {
+		dialog, err := gtk.FileChooserDialogNewWith2Buttons("Select folder", win, gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, "Cancel", gtk.RESPONSE_CANCEL, "Select", gtk.RESPONSE_ACCEPT)
+		if err != nil {
+			log.Fatal("Failed to create dialog box:", err)
+		}
+		defer dialog.Destroy()
+
+		response := dialog.Run()
+		if response == gtk.RESPONSE_ACCEPT {
+			folderPath := dialog.GetFilename()
+			log.Println("Selected folder:", folderPath)
+			entry.SetText(folderPath)
+		}
+	})
+
+	win.Connect("destroy", func() {
+		fmt.Println("Destroy")
+	})
+
+	win.Connect("delete-event", func() bool {
+		win.Hide()  // Hide the window.
+		return true // Returning true prevents further propagation of the signal and stops the window from closing.
+	})
+
+	return win
 }
 
 func onReady() {
@@ -62,8 +139,8 @@ func onReady() {
 	go playSound("resources/start.mp3")
 
 	// Create a menu item to display a message
-	mMessage := systray.AddMenuItem("Show Message", "Show a text message")
-	mQuit := systray.AddMenuItem("Quit", "Quit the whole app")
+	mSettings := systray.AddMenuItem("Settings", "Settings of Hubstaff Time Tracking Tray Application")
+	mQuit := systray.AddMenuItem("Quit", "Quit of Hubstaff Time Tracking Tray Application")
 
 	// Initial fetch of tracked time
 	trackedTime, tracking = fetchInitialTime()
@@ -90,12 +167,19 @@ func onReady() {
 	for {
 		select {
 		case icon := <-iconChangeChan:
-			fmt.Println("Main loop: Changing icon")
+			fmt.Println("Changing icon")
 			systray.SetIcon(icon)
-		case <-mMessage.ClickedCh:
-			systray.SetTitle("New Message!")
-			fmt.Println("This is your message!")
+		case <-mSettings.ClickedCh:
+			glib.IdleAdd(func() {
+				win.ShowAll()
+				win.Present() // Ensure the window is brought to the front
+			})
+			fmt.Println("Open settings window")
 		case <-mQuit.ClickedCh:
+			glib.IdleAdd(func() {
+				win.Destroy()
+				gtk.MainQuit()
+			})
 			systray.Quit()
 			fmt.Println("Quitting...")
 			return
@@ -277,10 +361,10 @@ func createProgressIcon(progress float64) []byte {
 func playSound(filePath string) {
 	// try use pulseaudio package
 	/*
-		    cmd := exec.Command("paplay", filePath)
-			if err := cmd.Run(); err != nil {
-				fmt.Println("Error playing sound:", err)
-			}*/
+		cmd := exec.Command("paplay", filePath)
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Error playing sound:", err)
+		}*/
 	// use alsa package
 	f, err := os.Open(filePath)
 	if err != nil {
