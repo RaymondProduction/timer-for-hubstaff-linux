@@ -48,7 +48,6 @@ var win *gtk.Window
 
 func main() {
 	gtk.Init(nil)
-	win = initGTKWindow()
 
 	flag.StringVar(&testMode, "t", "", "Enable test mode with status JSON")
 	flag.StringVar(&testMode, "test", "", "Enable test mode with status JSON")
@@ -118,11 +117,6 @@ func initGTKWindow() *gtk.Window {
 		fmt.Println("Destroy")
 	})
 
-	win.Connect("delete-event", func() bool {
-		win.Hide()  // Hide the window.
-		return true // Returning true prevents further propagation of the signal and stops the window from closing.
-	})
-
 	return win
 }
 
@@ -171,6 +165,7 @@ func onReady() {
 			systray.SetIcon(icon)
 		case <-mSettings.ClickedCh:
 			glib.IdleAdd(func() {
+				win = initGTKWindow()
 				win.ShowAll()
 				win.Present() // Ensure the window is brought to the front
 			})
