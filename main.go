@@ -35,6 +35,8 @@ type HubstaffStatus struct {
 }
 
 var trackedTime time.Duration
+var fakeHubstaffTrackedTime time.Duration
+
 var tracking bool
 var ticker *time.Ticker
 
@@ -48,6 +50,7 @@ var win *gtk.Window
 
 func main() {
 	gtk.Init(nil)
+	win = initGTKWindow()
 
 	flag.StringVar(&testMode, "t", "", "Enable test mode with status JSON")
 	flag.StringVar(&testMode, "test", "", "Enable test mode with status JSON")
@@ -142,6 +145,11 @@ func initGTKWindow() *gtk.Window {
 		fmt.Println("Destroy")
 	})
 
+	win.Connect("delete-event", func() bool {
+		win.Hide()  // Hide the window.
+		return true // Returning true prevents further propagation of the signal and stops the window from closing.
+	})
+
 	return win
 }
 
@@ -164,6 +172,7 @@ func onReady() {
 	// Initial fetch of tracked time
 	if testMode != "" {
 		trackedTime, tracking = parseTestStatus(testMode)
+		fakeHubstaffTrackedTime = trackedTime
 	} else {
 		trackedTime, tracking = fetchInitialTime()
 	}
@@ -173,14 +182,19 @@ func onReady() {
 		updateIcon()
 	}
 
-	// Run a goroutine to sync time with Hubstaff CLI every minute
+	// Run a ticker to sync time with Hubstaff CLI every minute
+	ticker = time.NewTicker(1 * time.Minute)
 	go func() {
-		for {
-			time.Sleep(1 * time.Minute)
+		for range ticker.C {
 			if testMode != "" {
-				trackedTime += time.Minute
+				fakeHubstaffTrackedTime += time.Minute
+				trackedTime = fakeHubstaffTrackedTime
+				fmt.Println("Fake tracked time = ", formatDuration(trackedTime))
 			} else {
 				trackedTime, tracking = fetchInitialTime()
+			}
+			if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
+				go playSound("resources/alarm-clock-elapsed.mp3")
 			}
 			updateIcon()
 			if tracking && ticker == nil {
@@ -199,7 +213,6 @@ func onReady() {
 			systray.SetIcon(icon)
 		case <-mSettings.ClickedCh:
 			glib.IdleAdd(func() {
-				win = initGTKWindow()
 				win.ShowAll()
 				win.Present() // Ensure the window is brought to the front
 			})
