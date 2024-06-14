@@ -34,17 +34,23 @@ type HubstaffStatus struct {
 	Tracking bool `json:"tracking"`
 }
 
-var trackedTime time.Duration
 var fakeHubstaffTrackedTime time.Duration
-
-var tracking bool
-var ticker *time.Ticker
-
-var redIcon []byte
 
 var iconChangeChan chan []byte
 
+var redIcon []byte
+
 var testMode string
+
+var secondTicker *time.Ticker
+
+var minuteTicker *time.Ticker
+
+var trackedTime time.Duration
+
+var trackedChangeChan chan string
+
+var tracking bool
 
 var win *gtk.Window
 
@@ -58,6 +64,7 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 	iconChangeChan = make(chan []byte, 1)
+	trackedChangeChan = make(chan string, 1)
 
 	go func() {
 		systray.Run(onReady, onExit)
@@ -173,44 +180,39 @@ func onReady() {
 	if testMode != "" {
 		trackedTime, tracking = parseTestStatus(testMode)
 		fakeHubstaffTrackedTime = trackedTime
+		fmt.Println("Test mode. Fake time = ", formatDuration(fakeHubstaffTrackedTime))
 	} else {
 		trackedTime, tracking = fetchInitialTime()
+		fmt.Println("First sync = ", formatDuration(fakeHubstaffTrackedTime))
 	}
 
+	fmt.Println("Tray to start")
+
 	if tracking {
-		startTicker()
+		startSecondTickerForDisplay()
 		updateIcon()
 	}
 
+	syncAndUpdate()
 	// Run a ticker to sync time with Hubstaff CLI every minute
-	ticker = time.NewTicker(1 * time.Minute)
+	minuteTicker = time.NewTicker(1 * time.Minute)
 	go func() {
-		for range ticker.C {
-			if testMode != "" {
-				fakeHubstaffTrackedTime += time.Minute
-				trackedTime = fakeHubstaffTrackedTime
-				fmt.Println("Fake tracked time = ", formatDuration(trackedTime))
-			} else {
-				trackedTime, tracking = fetchInitialTime()
-			}
-			if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
-				go playSound("resources/alarm-clock-elapsed.mp3")
-			}
-			updateIcon()
-			if tracking && ticker == nil {
-				startTicker()
-			} else if !tracking && ticker != nil {
-				stopTicker()
-			}
+		fmt.Println("Strat ticker to sync")
+		for range minuteTicker.C {
+			syncAndUpdate()
+
 		}
 	}()
 
-	// Handle icon changes and menu events in the main goroutine
+	// Handle icon changes, display tracked time and menu events in the main goroutine
 	for {
 		select {
 		case icon := <-iconChangeChan:
 			fmt.Println("Changing icon")
 			systray.SetIcon(icon)
+		case fromatedTrackedTime := <-trackedChangeChan:
+			fmt.Println("Tracked: ", fromatedTrackedTime)
+			systray.SetTitle(fromatedTrackedTime)
 		case <-mSettings.ClickedCh:
 			glib.IdleAdd(func() {
 				win.ShowAll()
@@ -226,6 +228,26 @@ func onReady() {
 			fmt.Println("Quitting...")
 			return
 		}
+	}
+}
+
+func syncAndUpdate() {
+	if testMode != "" {
+		fakeHubstaffTrackedTime += time.Minute
+		trackedTime = fakeHubstaffTrackedTime
+		fmt.Println("Fake tracked time = ", formatDuration(trackedTime))
+	} else {
+		trackedTime, tracking = fetchInitialTime()
+		fmt.Println("Tracked time = ", formatDuration(trackedTime))
+	}
+	if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
+		go playSound("resources/alarm-clock-elapsed.mp3")
+	}
+	updateIcon()
+	if tracking && secondTicker == nil {
+		startSecondTickerForDisplay()
+	} else if !tracking && secondTicker != nil {
+		stopSesondTickerForDisplay()
 	}
 }
 
@@ -329,13 +351,12 @@ func formatDuration(d time.Duration) string {
 }
 
 // startTicker starts the ticker for updating the time every second
-func startTicker() {
-	ticker = time.NewTicker(1 * time.Second)
-	fmt.Println("Starting ticker")
+func startSecondTickerForDisplay() {
+	secondTicker = time.NewTicker(1 * time.Second)
+	fmt.Println("Starting second ticker for display")
 	go func() {
-		for range ticker.C {
-			trackedTime += time.Second
-			systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
+		for range secondTicker.C {
+			trackedChangeChan <- fmt.Sprintf("Tracked: %s", formatDuration(trackedTime))
 
 			if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
 				go playSound("resources/alarm-clock-elapsed.mp3")
@@ -345,12 +366,12 @@ func startTicker() {
 }
 
 // stopTicker stops the ticker
-func stopTicker() {
-	if ticker != nil {
-		ticker.Stop()
-		ticker = nil
+func stopSesondTickerForDisplay() {
+	if secondTicker != nil {
+		secondTicker.Stop()
+		secondTicker = nil
 	}
-	fmt.Println("Stopping ticker")
+	fmt.Println("Stopping second ticker for display")
 	iconChangeChan <- redIcon
 }
 
