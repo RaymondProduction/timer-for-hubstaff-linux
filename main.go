@@ -48,7 +48,7 @@ var minuteTicker *time.Ticker
 
 var trackedTime time.Duration
 
-var trackedChangeChan chan string
+var trackedChangeChan chan struct{}
 
 var tracking bool
 
@@ -64,7 +64,7 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 	iconChangeChan = make(chan []byte, 1)
-	trackedChangeChan = make(chan string, 1)
+	trackedChangeChan = make(chan struct{}, 1)
 
 	go func() {
 		systray.Run(onReady, onExit)
@@ -210,9 +210,9 @@ func onReady() {
 		case icon := <-iconChangeChan:
 			fmt.Println("Changing icon")
 			systray.SetIcon(icon)
-		case fromatedTrackedTime := <-trackedChangeChan:
-			fmt.Println("Tracked: ", fromatedTrackedTime)
-			systray.SetTitle(fromatedTrackedTime)
+		case <-trackedChangeChan:
+			fmt.Println("Tracked: ", formatDuration(trackedTime))
+			systray.SetTitle(formatDuration(trackedTime))
 		case <-mSettings.ClickedCh:
 			glib.IdleAdd(func() {
 				win.ShowAll()
@@ -356,8 +356,7 @@ func startSecondTickerForDisplay() {
 	fmt.Println("Starting second ticker for display")
 	go func() {
 		for range secondTicker.C {
-			trackedChangeChan <- fmt.Sprintf("Tracked: %s", formatDuration(trackedTime))
-
+			trackedChangeChan <- struct{}{}
 			if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
 				go playSound("resources/alarm-clock-elapsed.mp3")
 			}
