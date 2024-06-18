@@ -36,8 +36,6 @@ type HubstaffStatus struct {
 
 var fakeHubstaffTrackedTime time.Duration
 
-var iconChangeChan chan []byte
-
 var redIcon []byte
 
 var testMode string
@@ -47,8 +45,6 @@ var secondTicker *time.Ticker
 var minuteTicker *time.Ticker
 
 var trackedTime time.Duration
-
-var trackedChangeChan chan struct{}
 
 var tracking bool
 
@@ -63,8 +59,6 @@ func main() {
 	// Set the custom usage function
 	flag.Usage = usage
 	flag.Parse()
-	iconChangeChan = make(chan []byte, 1)
-	trackedChangeChan = make(chan struct{}, 1)
 
 	go func() {
 		systray.Run(onReady, onExit)
@@ -207,12 +201,6 @@ func onReady() {
 	// Handle icon changes, display tracked time and menu events in the main goroutine
 	for {
 		select {
-		case icon := <-iconChangeChan:
-			fmt.Println("Changing icon")
-			systray.SetIcon(icon)
-		case <-trackedChangeChan:
-			fmt.Println("Tracked: ", formatDuration(trackedTime))
-			systray.SetTitle(formatDuration(trackedTime))
 		case <-mSettings.ClickedCh:
 			glib.IdleAdd(func() {
 				win.ShowAll()
@@ -253,7 +241,6 @@ func syncAndUpdate() {
 
 func onExit() {
 	// Cleaning up resources before exiting
-	close(iconChangeChan)
 }
 
 // getIcon reads an icon file from the given path.
@@ -356,9 +343,11 @@ func startSecondTickerForDisplay() {
 	fmt.Println("Starting second ticker for display")
 	go func() {
 		for range secondTicker.C {
-			trackedChangeChan <- struct{}{}
-			if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
-				go playSound("resources/alarm-clock-elapsed.mp3")
+			trackedTime += time.Second
+			systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
+
+			if int(trackedTime.Minutes())%60 == 0 && int(trackedTime.Seconds())%60 == 0 {
+				go playSound("resources/alarm-clock-elapsed.oga")
 			}
 		}
 	}()
@@ -371,13 +360,14 @@ func stopSesondTickerForDisplay() {
 		secondTicker = nil
 	}
 	fmt.Println("Stopping second ticker for display")
-	iconChangeChan <- redIcon
+	systray.SetIcon(redIcon)
 }
 
 // updateIcon updates the progress icon based on the tracked time
 func updateIcon() {
+	fmt.Println("Update icon")
 	progress := float64(trackedTime) / float64(8*time.Hour) // 8 hours as 100%
-	iconChangeChan <- createProgressIcon(progress)
+	systray.SetIcon(createProgressIcon(progress))
 }
 
 // createProgressIcon creates an icon with a progress circle
