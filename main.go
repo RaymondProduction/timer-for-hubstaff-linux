@@ -34,15 +34,11 @@ type HubstaffStatus struct {
 	Tracking bool `json:"tracking"`
 }
 
-var fakeHubstaffTrackedTime time.Duration
-
 var redIcon []byte
 
 var testMode string
 
 var secondTicker *time.Ticker
-
-var minuteTicker *time.Ticker
 
 var trackedTime time.Duration
 
@@ -173,13 +169,12 @@ func onReady() {
 	// Initial fetch of tracked time
 	if testMode != "" {
 		trackedTime, tracking = parseTestStatus(testMode)
-		fakeHubstaffTrackedTime = trackedTime
-		fmt.Println("Test mode. Fake time = ", formatDuration(fakeHubstaffTrackedTime))
+		fmt.Println("Test mode. Fake time = ", formatDuration(trackedTime))
+
 	} else {
 		trackedTime, tracking = fetchInitialTime()
-		fmt.Println("First sync = ", formatDuration(fakeHubstaffTrackedTime))
 	}
-
+	fmt.Println("First sync = ", formatDuration(trackedTime))
 	fmt.Println("Tray to start")
 
 	if tracking {
@@ -188,15 +183,6 @@ func onReady() {
 	}
 
 	syncAndUpdate()
-	// Run a ticker to sync time with Hubstaff CLI every minute
-	minuteTicker = time.NewTicker(1 * time.Minute)
-	go func() {
-		fmt.Println("Strat ticker to sync")
-		for range minuteTicker.C {
-			syncAndUpdate()
-
-		}
-	}()
 
 	// Handle icon changes, display tracked time and menu events in the main goroutine
 	for {
@@ -220,14 +206,11 @@ func onReady() {
 }
 
 func syncAndUpdate() {
-	if testMode != "" {
-		fakeHubstaffTrackedTime += time.Minute
-		trackedTime = fakeHubstaffTrackedTime
-		fmt.Println("Fake tracked time = ", formatDuration(trackedTime))
-	} else {
+	if testMode == "" {
 		trackedTime, tracking = fetchInitialTime()
-		fmt.Println("Tracked time = ", formatDuration(trackedTime))
 	}
+
+	fmt.Println("Tracked time = ", formatDuration(trackedTime))
 	if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
 		go playSound("resources/alarm-clock-elapsed.mp3")
 	}
@@ -344,7 +327,12 @@ func startSecondTickerForDisplay() {
 	go func() {
 		for range secondTicker.C {
 			trackedTime += time.Second
+			fmt.Println("Tracked: ", formatDuration(trackedTime))
 			systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
+
+			if int(trackedTime.Seconds())%60 == 0 {
+				syncAndUpdate()
+			}
 
 			if int(trackedTime.Minutes())%60 == 0 && int(trackedTime.Seconds())%60 == 0 {
 				go playSound("resources/alarm-clock-elapsed.oga")
