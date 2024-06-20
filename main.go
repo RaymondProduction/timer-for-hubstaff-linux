@@ -38,7 +38,7 @@ var redIcon []byte
 
 var testMode string
 
-var secondTicker *time.Ticker
+//var secondTicker *time.Ticker
 
 var trackedTime time.Duration
 
@@ -178,11 +178,11 @@ func onReady() {
 	fmt.Println("Tray to start")
 
 	if tracking {
-		startSecondTickerForDisplay()
 		updateIcon()
+		startDisplay()
 	}
 
-	syncAndUpdate()
+	//syncAndUpdate()
 
 	// Handle icon changes, display tracked time and menu events in the main goroutine
 	for {
@@ -215,11 +215,11 @@ func syncAndUpdate() {
 		go playSound("resources/alarm-clock-elapsed.mp3")
 	}
 	updateIcon()
-	if tracking && secondTicker == nil {
-		startSecondTickerForDisplay()
-	} else if !tracking && secondTicker != nil {
-		stopSesondTickerForDisplay()
-	}
+	// if tracking /* && secondTicker == nil*/ {
+	// 	startDisplay()
+	// } else if !tracking && secondTicker != nil {
+	// 	stopSesondTickerForDisplay()
+	// }
 }
 
 func onExit() {
@@ -321,15 +321,14 @@ func formatDuration(d time.Duration) string {
 }
 
 // startTicker starts the ticker for updating the time every second
-func startSecondTickerForDisplay() {
-	secondTicker = time.NewTicker(1 * time.Second)
-	fmt.Println("Starting second ticker for display")
+func startDisplay() {
 	go func() {
-		for range secondTicker.C {
+		for {
 			trackedTime += time.Second
 			fmt.Println("Tracked: ", formatDuration(trackedTime))
+			time.Sleep(500 * time.Millisecond)
 			systray.SetTitle(fmt.Sprintf("Tracked: %s", formatDuration(trackedTime)))
-
+			time.Sleep(500 * time.Millisecond)
 			if int(trackedTime.Seconds())%60 == 0 {
 				syncAndUpdate()
 			}
@@ -339,14 +338,22 @@ func startSecondTickerForDisplay() {
 			}
 		}
 	}()
+
+	// secondTicker = time.NewTicker(1 * time.Second)
+	// fmt.Println("Starting second ticker for display")
+	// go func() {
+	// 	for range secondTicker.C {
+
+	// 	}
+	// }()
 }
 
 // stopTicker stops the ticker
 func stopSesondTickerForDisplay() {
-	if secondTicker != nil {
-		secondTicker.Stop()
-		secondTicker = nil
-	}
+	// if secondTicker != nil {
+	// 	secondTicker.Stop()
+	// 	secondTicker = nil
+	// }
 	fmt.Println("Stopping second ticker for display")
 	systray.SetIcon(redIcon)
 }
@@ -397,33 +404,34 @@ func createProgressIcon(progress float64) []byte {
 // playSound plays the specified sound file
 func playSound(filePath string) {
 	// try use pulseaudio package
-	/*
-		cmd := exec.Command("paplay", filePath)
-		if err := cmd.Run(); err != nil {
-			fmt.Println("Error playing sound:", err)
-		}*/
-	// use alsa package
-	f, err := os.Open(filePath)
+	cmd := exec.Command("paplay", filePath)
+	err := cmd.Run()
 	if err != nil {
-		fmt.Println("Error opening sound file:", err)
-		return
+		fmt.Println("Error playing sound:", err)
+		fmt.Println("Try to use alsa package")
+		// use alsa package
+		f, err := os.Open(filePath)
+		if err != nil {
+			fmt.Println("Error opening sound file:", err)
+			return
+		}
+		defer f.Close()
+
+		streamer, format, err := mp3.Decode(f)
+		if err != nil {
+			// Error decoding sound file: mp3: mp3: MPEG version 2.5 is not supported
+			fmt.Println("Error decoding sound file:", err)
+			return
+		}
+		defer streamer.Close()
+
+		speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+
+		done := make(chan bool)
+		speaker.Play(beep.Seq(streamer, beep.Callback(func() {
+			done <- true
+		})))
+
+		<-done
 	}
-	defer f.Close()
-
-	streamer, format, err := mp3.Decode(f)
-	if err != nil {
-		// Error decoding sound file: mp3: mp3: MPEG version 2.5 is not supported
-		fmt.Println("Error decoding sound file:", err)
-		return
-	}
-	defer streamer.Close()
-
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
-
-	done := make(chan bool)
-	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
-		done <- true
-	})))
-
-	<-done
 }
