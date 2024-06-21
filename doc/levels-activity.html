@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Calculating Activity Levels</title>
+</head>
+<body>
+    <h2>Calculating Activity Levels</h2>
+    <p>Below is how Hubstaff calculates activity levels:</p>
+    <ol>
+        <li>For every second, the user is labeled as active or inactive. A mouse movement or keyboard stroke = active. No keyboard or mouse = inactive.</li>
+        <li>All these numbers are added up and a total % of activity for a 10-minute segment is given using this equation: Active seconds / 600 = activity rate %</li>
+        <li>If the user is inactive for 20 minutes, the desktop client gives the option to remove that time from their log because they were inactive.</li>
+    </ol>
+    <p><strong>Here’s an easy way to think about how we calculate activity rates:</strong></p>
+    <p>If you have 100 seconds of tracked time, and 20 seconds of idle time (no mouse or keyboard movement), you’d have an 80% activity rate.</p>
+    <p><strong>Those 100 seconds might look like this:</strong></p>
+    <table border="2px">
+        <tr>
+            <th>Time</th>
+            <th>Mouse</th>
+            <th>Keyboard</th>
+            <th>No Activity</th>
+            <th>Total Activity</th>
+        </tr>
+        <tr>
+            <td>20 seconds</td>
+            <td>Yes</td>
+            <td></td>
+            <td></td>
+            <td>20</td>
+        </tr>
+        <tr>
+            <td>35 seconds</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td></td>
+            <td>35</td>
+        </tr>
+        <tr>
+            <td>15 seconds</td>
+            <td></td>
+            <td>Yes</td>
+            <td></td>
+            <td>15</td>
+        </tr>
+        <tr>
+            <td>20 seconds</td>
+            <td></td>
+            <td></td>
+            <td>Yes</td>
+            <td>0</td>
+        </tr>
+        <tr>
+            <td>10 seconds</td>
+            <td>Yes</td>
+            <td></td>
+            <td></td>
+            <td>10</td>
+        </tr>
+        <tr>
+            <td colspan="4"></td>
+            <td>80 seconds or 80% activity out of 100 seconds</td>
+        </tr>
+    </table>
+    <p><strong>80% overall activity rate</strong></p>
+    <p>Because 80% of the 100 seconds were spent using the mouse or keyboard.</p>
+</body>
+</html>
