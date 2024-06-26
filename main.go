@@ -16,6 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/faiface/beep"
+	"github.com/faiface/beep/mp3"
+	"github.com/faiface/beep/speaker"
 	"github.com/fogleman/gg"
 	"github.com/getlantern/systray"
 )
@@ -30,6 +33,7 @@ type HubstaffStatus struct {
 var (
 	timezone    string
 	trackedTime time.Duration
+	redIcon     []byte
 )
 
 func main() {
@@ -39,7 +43,12 @@ func main() {
 func onReady() {
 	timezone = "Local"
 
-	//systray.SetIcon(getIcon("assets/clock.ico"))
+	redIcon = getIcon("redIcon.png")
+	fmt.Println("Red icon size:", len(redIcon))
+	systray.SetIcon(redIcon)
+
+	// Play sound on startup
+	//go playSound("resources/start.mp3")
 
 	localTime := systray.AddMenuItem("Local time", "Local time")
 	hcmcTime := systray.AddMenuItem("Ho Chi Minh time", "Asia/Ho_Chi_Minh")
@@ -57,6 +66,9 @@ func onReady() {
 
 			fmt.Printf("Display time = %s, second =  %d\n", displayTime, second)
 			if int(trackedTime.Seconds())%60 == 0 {
+				if int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30 {
+					playSound("resources/alarm-clock-elapsed.oga")
+				}
 				trackedTime, _ = fetchInitialTime()
 			} else {
 				trackedTime += time.Second
@@ -212,4 +224,39 @@ func formatDuration(d time.Duration) string {
 	minutes := int(d.Minutes()) % 60
 	seconds := int(d.Seconds()) % 60
 	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+// playSound plays the specified sound file
+func playSound(filePath string) {
+	// try use pulseaudio package
+	cmd := exec.Command("paplay", filePath)
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("Error playing sound:", err)
+		fmt.Println("Try to use alsa package")
+		// use alsa package
+		f, err := os.Open(filePath)
+		if err != nil {
+			fmt.Println("Error opening sound file:", err)
+			return
+		}
+		defer f.Close()
+
+		streamer, format, err := mp3.Decode(f)
+		if err != nil {
+			// Error decoding sound file: mp3: mp3: MPEG version 2.5 is not supported
+			fmt.Println("Error decoding sound file:", err)
+			return
+		}
+		defer streamer.Close()
+
+		speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+
+		done := make(chan bool)
+		speaker.Play(beep.Seq(streamer, beep.Callback(func() {
+			done <- true
+		})))
+
+		<-done
+	}
 }
