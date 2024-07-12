@@ -160,7 +160,7 @@ func onReady() {
 	systray.SetTooltip("Tray Clock with Messages")
 
 	// Play sound on startup
-	go playSound("resources/start.mp3")
+	//go playSound("resources/start.mp3")
 
 	// Create a menu item to display a message
 	mSettings := systray.AddMenuItem("Settings", "Settings of Hubstaff Time Tracking Tray Application")
@@ -212,7 +212,7 @@ func syncAndUpdate() {
 
 	fmt.Println("Tracked time = ", formatDuration(trackedTime))
 	if (int(trackedTime.Minutes())%60 == 0 || int(trackedTime.Minutes())%60 == 30) && int(trackedTime.Seconds())%60 == 0 {
-		go playSound("resources/alarm-clock-elapsed.mp3")
+		//	go playSound("resources/alarm-clock-elapsed.mp3")
 	}
 	updateIcon()
 	// if tracking /* && secondTicker == nil*/ {
@@ -334,7 +334,7 @@ func startDisplay() {
 			}
 
 			if int(trackedTime.Minutes())%60 == 0 && int(trackedTime.Seconds())%60 == 0 {
-				go playSound("resources/alarm-clock-elapsed.oga")
+				//go playSound("resources/alarm-clock-elapsed.oga")
 			}
 		}
 	}()
